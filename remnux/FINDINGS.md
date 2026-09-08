@@ -46,11 +46,19 @@ Categorías de fallo adicionales más allá de los 7 documentados arriba:
 - Fallos npm sin mensaje explícito (probablemente `npm` ausente o fallo silencioso del módulo `npm.installed`): `box-js`, `js-deobfuscator`, `JStillery`, `webcrack`, `playwright`, `opencode-ai`, `@remnux/mcp-server`.
 - Fallos en cascada de `file.managed`/`archive.extracted` derivados de estados previos fallidos (ej. `ghidra-data-type.zip`).
 
-## Test-kit `remnux-arm64-testkit` (completado, entregado por separado)
+## Exclude-list validada (46 rutas)
 
-Repo local con `README.md`, `FINDINGS.md`, `exclude-list.txt` (46 rutas), `install.sh`, `verify.sh`. Validado en VM limpia: `install.sh` corre `state.apply remnux.addon` excluyendo las 46 rutas → **0 `Failed`** en el log. `verify.sh` confirma que los 7 binarios rotos conocidos (`cutter`, `redress`, `yr`, `docker-compose`, `die`, `diec`, `inspircd`) **no** quedan instalados.
+Se ha construido una exclude-list de 46 rutas `.sls` que, aplicada sobre `state.apply remnux.addon` (`salt-call --local state.apply remnux.addon exclude=<46 rutas>`), deja la instalación en **0 `Failed`** en la corrida limpia sobre VM. Verificación posterior confirmó que los 7 binarios rotos conocidos (`cutter`, `redress`, `yr`, `docker-compose`, `die`, `diec`, `inspircd`) **no** quedan instalados tras aplicar la exclusión.
 
-Desglose del exclude-list por categoría: 2 ruidosos, 4 silenciosos, 2 pip-tag (ambos vía macro stpyv8), 4 de build sin confirmar como límite duro de arm64 (`peframe`, `qiling`, `pe-tree`, `vivisect`), 3 de módulo Salt (rubygems: `origamindee`/`pdnstool`/`pedump`), ~25 NO-PKG, 5 npm sin clasificar.
+Desglose del exclude-list por categoría:
+
+- **2 ruidosos**: `inspircd`, `detect-it-easy`
+- **4 silenciosos**: `docker-compose`, `cutter`, `redress`, `yara-x`
+- **2 pip-tag**: `peepdf-3`, `thug` (ambos vía macro `install_stpyv8`)
+- **4 de build sin confirmar como límite duro de arm64**: `peframe`, `qiling`, `pe-tree`, `vivisect`
+- **3 de módulo Salt** (rubygems, `gem.installed` no disponible en Salt 3008.2): `origamindee`, `pdnstool`, `pedump`
+- **~25 NO-PKG**: paquetes ausentes de los repos de Ubuntu (no confirmado como problema de arquitectura)
+- **5 npm sin clasificar**
 
 `remnux.packages.nodejs` **deliberadamente no excluido** — falló en la corrida completa sin mensaje de error capturado; pendiente de investigar antes de decidir si se excluye.
 

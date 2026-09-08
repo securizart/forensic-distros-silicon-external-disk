@@ -31,7 +31,7 @@ Tres patrones de fallo confirmados:
 2. **Silencioso** (binario/AppImage/tarball suelto sin dpkg): `docker-compose.sls`, `cutter.sls`, `redress.sls`, `yara-x.sls` — Salt marca `Succeeded` pero el binario da `Exec format error` al ejecutarlo.
 3. **Explícito** (pip wheel tags): `stpyv8.sls` (vía `peepdf-3.sls`/`thug.sls`) — pip rechaza el wheel con `not a supported wheel on this platform`.
 
-Existe ya un kit de instalación reproducible con exclude-list de 46 rutas validadas (0 `Failed` en la corrida limpia): repo local `remnux-arm64-testkit` (README.md/FINDINGS.md/exclude-list.txt/install.sh/verify.sh), pendiente de subir a GitHub por separado o de fusionar aquí como submódulo.
+Se ha construido una exclude-list reproducible de 46 rutas que, aplicada sobre `remnux.addon`, deja la instalación en 0 `Failed` en la corrida limpia. Detalle completo de la lista y su desglose por categoría en [`remnux/FINDINGS.md`](remnux/FINDINGS.md).
 
 Pendiente sin clasificar del todo: ~25 paquetes `NO-PKG` (ausentes de los repos de Ubuntu, no necesariamente problema de arquitectura) y 5 paquetes npm (`box-js`, `js-deobfuscator`, `jstillery`, `webcrack`, `opencode`) sin mensaje de error capturado.
 

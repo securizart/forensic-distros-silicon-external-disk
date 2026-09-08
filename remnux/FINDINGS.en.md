@@ -46,11 +46,19 @@ Additional failure categories beyond the 7 documented above:
 - npm failures with no explicit error (likely missing `npm` or a silent `npm.installed` module failure): `box-js`, `js-deobfuscator`, `JStillery`, `webcrack`, `playwright`, `opencode-ai`, `@remnux/mcp-server`.
 - Cascade `file.managed`/`archive.extracted` failures from earlier failed states (e.g. `ghidra-data-type.zip`).
 
-## `remnux-arm64-testkit` (completed, delivered separately)
+## Validated exclude-list (46 paths)
 
-Local repo with `README.md`, `FINDINGS.md`, `exclude-list.txt` (46 paths), `install.sh`, `verify.sh`. Validated on a clean VM: `install.sh` runs `state.apply remnux.addon` excluding the 46 paths → **0 `Failed`** in the log. `verify.sh` confirms the 7 known-broken binaries (`cutter`, `redress`, `yr`, `docker-compose`, `die`, `diec`, `inspircd`) are **not** installed.
+A 46-path `.sls` exclude-list was built which, applied on `state.apply remnux.addon` (`salt-call --local state.apply remnux.addon exclude=<46 paths>`), leaves the install at **0 `Failed`** on a clean VM run. Subsequent verification confirmed the 7 known-broken binaries (`cutter`, `redress`, `yr`, `docker-compose`, `die`, `diec`, `inspircd`) are **not** installed after applying the exclusion.
 
-Exclude-list breakdown by category: 2 loud, 4 silent, 2 pip-tag (both via the stpyv8 macro), 4 build-related not confirmed as a hard arm64 limit (`peframe`, `qiling`, `pe-tree`, `vivisect`), 3 Salt-module related (rubygems: `origamindee`/`pdnstool`/`pedump`), ~25 NO-PKG, 5 unclassified npm.
+Exclude-list breakdown by category:
+
+- **2 loud**: `inspircd`, `detect-it-easy`
+- **4 silent**: `docker-compose`, `cutter`, `redress`, `yara-x`
+- **2 pip-tag**: `peepdf-3`, `thug` (both via the `install_stpyv8` macro)
+- **4 build-related, not confirmed as a hard arm64 limit**: `peframe`, `qiling`, `pe-tree`, `vivisect`
+- **3 Salt-module related** (rubygems, `gem.installed` unavailable in Salt 3008.2): `origamindee`, `pdnstool`, `pedump`
+- **~25 NO-PKG**: packages absent from Ubuntu's repos (not confirmed as an architecture issue)
+- **5 unclassified npm**
 
 `remnux.packages.nodejs` **deliberately not excluded** — it failed on the full run with no captured error message; pending investigation before deciding whether to exclude it.
 
