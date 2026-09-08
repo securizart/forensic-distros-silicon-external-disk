@@ -1,0 +1,20 @@
+GNU GENERAL PUBLIC LICENSE
+Version 3, 29 June 2007
+
+Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
+Everyone is permitted to copy and distribute verbatim copies of this
+license document, but changing it is not allowed.
+
+---
+
+NOTA: por restricciones de red de este entorno de trabajo no ha sido
+posible descargar aquí el texto íntegro y canónico de la GPLv3 desde
+gnu.org. Antes de subir el repo, sustituye este fichero por el texto
+completo oficial, por ejemplo copiándolo del LICENSE ya existente en
+el proyecto principal (`securizart/offensive-installer-silicon-chip`,
+que ya usa GPLv3) o descargándolo tú mismo de:
+
+    https://www.gnu.org/licenses/gpl-3.0.txt
+
+Este proyecto se distribuye bajo los términos de la GNU General Public
+License, versión 3, publicada por la Free Software Foundation.
