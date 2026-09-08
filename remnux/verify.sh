@@ -75,9 +75,10 @@ fi
 #                      baja prioridad para que NUNCA compita con el
 #                      archivo de Ubuntu en otros paquetes (mismo
 #                      patrón que el pin de Kali en el instalador base)
-#   - redress / yr:   toolchains nativas (golang-go / cargo, ambas de
-#                      los repos de Ubuntu) + compilación propia; no
-#                      tocan libs del sistema más allá de compilar
+#   - redress:        toolchain nativa (golang-go de apt) + compilación
+#                      propia; no toca libs del sistema más allá de compilar
+#   - yr (yara-x):    rustup (toolchain Rust aislado en $HOME), NO el
+#                      cargo de apt (demasiado antiguo para yara-x-cli)
 #   - inspircd:       SOLO bajo flag aparte — la versión de Ubuntu
 #                      (3.17.0) es 2 majors más vieja que la 4.7.0 que
 #                      pide remnux, no es un sustituto limpio
@@ -96,20 +97,30 @@ install_docker_compose() {
 }
 
 install_cutter() {
-    echo "[2/6] cutter -> cutter-re (repo oficial RizinOrg, arm64)"
+    echo "[2/6] cutter -> cutter-re (repo oficial RizinOrg, arm64, build xUbuntu_24.04)"
+    echo "      AVISO: la build para xUbuntu_22.04 falla en Ubuntu 24.04 porque"
+    echo "      depende de libpython3.10 (24.04 trae libpython3.12). Se usa la"
+    echo "      carpeta xUbuntu_24.04 del mismo repo OBS, no confirmada al 100%"
+    echo "      desde aquí (sin acceso directo al repo) — si también falla,"
+    echo "      la alternativa es compilar Cutter desde fuente."
     echo "      Repo pineado a Pin-Priority 100 para que nunca sustituya"
     echo "      paquetes del archivo principal de Ubuntu."
-    curl -fsSL https://download.opensuse.org/repositories/home:RizinOrg/xUbuntu_22.04/Release.key \
+    curl -fsSL https://download.opensuse.org/repositories/home:RizinOrg/xUbuntu_24.04/Release.key \
         | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/home-rizinorg.gpg >/dev/null
-    echo 'deb [signed-by=/etc/apt/trusted.gpg.d/home-rizinorg.gpg] https://download.opensuse.org/repositories/home:/RizinOrg/xUbuntu_22.04/ /' \
+    echo 'deb [signed-by=/etc/apt/trusted.gpg.d/home-rizinorg.gpg] https://download.opensuse.org/repositories/home:/RizinOrg/xUbuntu_24.04/ /' \
         | sudo tee /etc/apt/sources.list.d/home-rizinorg.list >/dev/null
     printf 'Package: *\nPin: origin download.opensuse.org\nPin-Priority: 100\n' \
         | sudo tee /etc/apt/preferences.d/rizinorg.pref >/dev/null
     sudo apt-get update
-    sudo apt-get install -y cutter-re
-    echo "      Instalado como 'cutter-re'. El binario suele quedar en"
-    echo "      /usr/bin/cutter-re o similar — revisa 'dpkg -L cutter-re'"
-    echo "      si necesitas un symlink a 'cutter'."
+    if sudo apt-get install -y cutter-re; then
+        echo "      Instalado como 'cutter-re'. El binario suele quedar en"
+        echo "      /usr/bin/cutter-re o similar — revisa 'dpkg -L cutter-re'"
+        echo "      si necesitas un symlink a 'cutter'."
+    else
+        echo "      FALLÓ también con xUbuntu_24.04. Alternativa: compilar desde"
+        echo "      fuente (ver https://github.com/rizinorg/cutter, Building Docs)"
+        echo "      o usar el AppImage x86_64 vía FEX-Emu/Box64 (no probado)."
+    fi
 }
 
 install_redress() {
@@ -120,10 +131,14 @@ install_redress() {
 }
 
 install_yara_x() {
-    echo "[4/6] yr (yara-x) -> compilado con Rust nativo (cargo, apt)"
-    # build-essential ya lo instala remnux.addon; se repite por si acaso.
-    sudo apt-get install -y cargo build-essential
-    cargo install yara-x-cli
+    echo "[4/6] yr (yara-x) -> compilado con Rust vía rustup (NO el cargo de apt)"
+    echo "      El cargo/rustc de los repos de Ubuntu 24.04 es 1.75.0;"
+    echo "      yara-x-cli exige rustc >= 1.93. rustup instala un toolchain"
+    echo "      moderno aislado en \$HOME/.cargo, sin tocar paquetes del sistema."
+    if [ ! -x "$HOME/.cargo/bin/cargo" ]; then
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+    fi
+    "$HOME/.cargo/bin/cargo" install yara-x-cli
     sudo ln -sf "$HOME/.cargo/bin/yr" /usr/local/bin/yr
     echo "      Instalado. Prueba: yr --version"
 }
