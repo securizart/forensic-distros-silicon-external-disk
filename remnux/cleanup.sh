@@ -37,9 +37,9 @@ for bin in "${!BROKEN_BINARIES[@]}"; do
         echo "  [--]   $bin: no está instalado, nada que hacer"
         continue
     fi
-    elf_arch=$(file -b "$path" 2>/dev/null | grep -oE 'ARM aarch64|x86-64' || echo "desconocido")
-    if [ "$elf_arch" != "x86-64" ]; then
-        echo "  [SKIP] $bin: instalado en $path pero NO es x86-64 (arch: $elf_arch) — no se toca"
+    elf_out=$(file -b "$path" 2>/dev/null || echo "")
+    if ! echo "$elf_out" | grep -qiE 'x86[_-]64'; then
+        echo "  [SKIP] $bin: instalado en $path pero NO es x86-64 (arch: $elf_out) — no se toca"
         continue
     fi
     dest="$BACKUP_DIR/$(basename "$path").x86_64.bak"

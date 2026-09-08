@@ -30,14 +30,14 @@ for name in "${!BROKEN_BINARIES[@]}"; do
         echo "  [OK]   $name: no instalado"
         continue
     fi
-    elf_arch=$(file -b "$path" 2>/dev/null | grep -oE 'ARM aarch64|x86-64' || echo "desconocido")
-    if [ "$elf_arch" = "x86-64" ]; then
+    elf_out=$(file -b "$path" 2>/dev/null || echo "")
+    if echo "$elf_out" | grep -qiE 'x86[_-]64'; then
         echo "  [MAL]  $name: instalado en $path pero es x86-64 (Exec format error esperado)"
         fail=1
-    elif [ "$elf_arch" = "ARM aarch64" ]; then
+    elif echo "$elf_out" | grep -qiE 'aarch64|arm64'; then
         echo "  [INFO] $name: instalado en $path y SÍ es arm64 (¿parche upstream? revisar)"
     else
-        echo "  [WARN] $name: instalado en $path, arquitectura no determinada"
+        echo "  [WARN] $name: instalado en $path, arquitectura no determinada ($elf_out)"
         fail=1
     fi
 done
