@@ -2,6 +2,8 @@
 
 🇬🇧 [English version](FINDINGS.en.md)
 
+Ver también: [`DEPENDENCIES.md`](DEPENDENCIES.md) (dependencias del sistema, Cast, Salt), [`CAST-INSTALL.md`](CAST-INSTALL.md) (pasos concretos de instalación de Cast), [`install.sh`](install.sh) + [`exclude-list.txt`](exclude-list.txt) (instalación reproducible), [`verify.sh`](verify.sh) (verificación post-instalación).
+
 ## Entorno de prueba
 
 VM UTM, Ubuntu Desktop 24.04 arm64, usuario `iac`. Cast v1.0.4 (`.deb` oficial de `ekristen/cast`, funciona nativo en Apple Silicon). `remnux/salt-states` clonado en `/home/iac/salt-states`. Salt 3008.2 instalado vía `packages.broadcom.com` en modo masterless (`file_client: local`, `file_roots → base: [/home/iac/salt-states]`). `grains osarch = arm64` confirmado. Snapshot UTM antes de cada prueba de `.sls`.

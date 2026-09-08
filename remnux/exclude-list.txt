@@ -1,0 +1,73 @@
+# exclude-list.txt — REMnux arm64
+#
+# Rutas .sls (relativas a remnux/salt-states/) a excluir de
+# `state.apply remnux.addon` para obtener una instalación con
+# 0 estados "Failed" en arm64.
+#
+# ESTADO: 27/46 rutas confirmadas con nombre exacto de paquete.
+# De esas 27, los 7 primeros paths (RUIDOSO + SILENCIOSO) están
+# verificados carpeta por carpeta contra remnux/salt-states. El
+# resto de nombres (PIP-TAG, BUILD, SALT-MOD, NO-PKG, NPM) tienen el
+# nombre de paquete confirmado pero la carpeta contenedora
+# (tools/, python3-packages/, etc.) es una inferencia por convención
+# del repo, sin verificar path por path contra el repo real — revisa
+# con `find remnux/salt-states -name '<paquete>.sls'` antes de usar
+# este fichero contra `state.apply`.
+# Faltan ~19 rutas de las categorías NO-PKG y npm sin path exacto
+# documentado (ver hueco marcado al final de cada bloque). Si tienes
+# el exclude-list.txt original completo, sustituye este fichero por
+# ese, o pega su contenido en el chat para cerrarlo al 100%.
+#
+# Categoría: RUIDOSO (Salt marca Failed, error claro de apt/dpkg
+# sobre dependencias :amd64)
+packages/inspircd.sls
+tools/detect-it-easy.sls
+
+# Categoría: SILENCIOSO (Salt marca Succeeded pero el binario es
+# ELF x86-64 -> Exec format error en tiempo de ejecución)
+tools/docker-compose.sls
+tools/cutter.sls
+tools/redress.sls
+tools/yara-x.sls
+
+# Categoría: PIP-TAG (pip rechaza el wheel por platform tag,
+# ambos vía la macro install_stpyv8)
+python3-packages/peepdf-3.sls
+python3-packages/thug.sls
+
+# Categoría: BUILD (fallo de compilación en arm64, no confirmado
+# como límite duro de arquitectura — candidatos a revisar en v0.2)
+tools/peframe.sls
+tools/qiling.sls
+tools/pe-tree.sls
+tools/vivisect.sls
+
+# Categoría: SALT-MOD (dependen de gem.installed/gem.removed,
+# no disponibles en Salt 3008.2)
+tools/origamindee.sls
+tools/pdnstool.sls
+tools/pedump.sls
+
+# Categoría: NO-PKG (paquete ausente de los repos de Ubuntu;
+# no confirmado como problema de arquitectura, sino de disponibilidad
+# del paquete). Confirmados por nombre:
+tools/ghidra.sls
+tools/powershell.sls
+tools/burpsuite-community.sls
+tools/edb-debugger.sls
+tools/flare-floss.sls
+# --- HUECO: ~20 rutas NO-PKG adicionales sin path exacto documentado ---
+# (paquetes ausentes de los repos de Ubuntu detectados en la corrida
+# completa de remnux.addon, pendientes de listar aquí)
+
+# Categoría: NPM (fallo sin mensaje de error explícito capturado;
+# probablemente npm ausente o fallo silencioso del módulo npm.installed)
+javascript-tools/box-js.sls
+javascript-tools/js-deobfuscator.sls
+javascript-tools/jstillery.sls
+javascript-tools/webcrack.sls
+javascript-tools/opencode-ai.sls
+# --- HUECO: confirmar path exacto de playwright.sls y @remnux/mcp-server.sls ---
+# remnux.packages.nodejs deliberadamente NO excluido: falló en la
+# corrida completa sin mensaje de error capturado, pendiente de
+# investigar antes de decidir si se excluye (ver remnux/FINDINGS.md).
