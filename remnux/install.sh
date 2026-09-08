@@ -39,9 +39,11 @@ if [ "$ARCH" != "arm64" ] && [ "$ARCH" != "aarch64" ]; then
     [ "$ans" = "y" ] || [ "$ans" = "Y" ] || exit 1
 fi
 
-# Construye la lista de exclusión en formato YAML-list para salt,
-# ignorando líneas vacías y comentarios (#) del fichero.
-EXCLUDE_ITEMS=$(grep -v '^\s*#' "$EXCLUDE_FILE" | grep -v '^\s*$' | sed 's#/#.#g; s#\.sls$##' | paste -sd, -)
+# Construye la lista de exclusión en formato YAML-list para salt.
+# exclude-list.txt ya está en dotted-path (p. ej. remnux.tools.cutter);
+# se recorta todo lo que vaya tras un '#' (comentario, inline o de línea
+# completa) y se ignoran líneas resultantes vacías.
+EXCLUDE_ITEMS=$(sed 's/#.*$//' "$EXCLUDE_FILE" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$' | paste -sd, -)
 
 echo "== Rutas excluidas (${EXCLUDE_ITEMS//,/$'\n'}) =="
 

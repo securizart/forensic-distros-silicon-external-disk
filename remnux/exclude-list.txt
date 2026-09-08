@@ -1,73 +1,84 @@
-# exclude-list.txt — REMnux arm64
-#
-# Rutas .sls (relativas a remnux/salt-states/) a excluir de
-# `state.apply remnux.addon` para obtener una instalación con
-# 0 estados "Failed" en arm64.
-#
-# ESTADO: 27/46 rutas confirmadas con nombre exacto de paquete.
-# De esas 27, los 7 primeros paths (RUIDOSO + SILENCIOSO) están
-# verificados carpeta por carpeta contra remnux/salt-states. El
-# resto de nombres (PIP-TAG, BUILD, SALT-MOD, NO-PKG, NPM) tienen el
-# nombre de paquete confirmado pero la carpeta contenedora
-# (tools/, python3-packages/, etc.) es una inferencia por convención
-# del repo, sin verificar path por path contra el repo real — revisa
-# con `find remnux/salt-states -name '<paquete>.sls'` antes de usar
-# este fichero contra `state.apply`.
-# Faltan ~19 rutas de las categorías NO-PKG y npm sin path exacto
-# documentado (ver hueco marcado al final de cada bloque). Si tienes
-# el exclude-list.txt original completo, sustituye este fichero por
-# ese, o pega su contenido en el chat para cerrarlo al 100%.
-#
-# Categoría: RUIDOSO (Salt marca Failed, error claro de apt/dpkg
-# sobre dependencias :amd64)
-packages/inspircd.sls
-tools/detect-it-easy.sls
+# exclude-list.txt
+# Lista de .sls de remnux/salt-states a excluir al aplicar remnux.addon en arm64.
+# Formato: una ruta de sls por línea (dotted path). Líneas que empiezan por # se ignoran.
+# Categoría entre corchetes al final de cada comentario:
+#   [RUIDOSO]    Salt marca Failed; .deb amd64 con dependencias apt no instalables.
+#   [SILENCIOSO] Salt marca Succeeded, pero el binario instalado da "Exec format error".
+#   [PIP-TAG]    pip rechaza el wheel explícitamente ("not a supported wheel on this platform").
+#   [BUILD]      Falla compilando/empaquetando desde código fuente; puede no ser específico de arm64.
+#   [NO-PKG]     El paquete simplemente no existe en los repos de Ubuntu para esta versión/arch.
+#   [SALT-MOD]   El módulo de estado de Salt no está disponible en esta versión de Salt (3008.2).
+#   [CASCADA]    Falla porque depende de algo de esta misma lista.
 
-# Categoría: SILENCIOSO (Salt marca Succeeded pero el binario es
-# ELF x86-64 -> Exec format error en tiempo de ejecución)
-tools/docker-compose.sls
-tools/cutter.sls
-tools/redress.sls
-tools/yara-x.sls
+# ---- Grupo RUIDOSO: .deb amd64 vía pkg.installed con deps :amd64 no instalables ----
+remnux.packages.inspircd                 # [RUIDOSO] deps :amd64 no instalables, confirmado con salida real
+remnux.tools.detect-it-easy              # [RUIDOSO] deps Qt5 :amd64 no instalables, confirmado con salida real
 
-# Categoría: PIP-TAG (pip rechaza el wheel por platform tag,
-# ambos vía la macro install_stpyv8)
-python3-packages/peepdf-3.sls
-python3-packages/thug.sls
+# ---- Grupo SILENCIOSO: binario/AppImage/tarball suelto sin dpkg ----
+remnux.tools.docker-compose              # [SILENCIOSO] ELF x86-64, Exec format error, confirmado
+remnux.tools.cutter                      # [SILENCIOSO] ELF x86-64, Exec format error, confirmado
+remnux.tools.redress                     # [SILENCIOSO] ELF x86-64, Exec format error, confirmado
+remnux.tools.yara-x                      # [SILENCIOSO] ELF x86-64 pie, Exec format error, confirmado
 
-# Categoría: BUILD (fallo de compilación en arm64, no confirmado
-# como límite duro de arquitectura — candidatos a revisar en v0.2)
-tools/peframe.sls
-tools/qiling.sls
-tools/pe-tree.sls
-tools/vivisect.sls
+# ---- Grupo PIP-TAG: wheel manylinux_x86_64 hardcodeado ----
+# stpyv8 no es un .sls independiente aplicable (solo define un macro Jinja),
+# se invoca desde peepdf-3.sls y thug.sls. Al fallar el pip.installed del wheel,
+# ambos .sls quedan con ese estado en Failed pero el resto de cada uno sí se aplica.
+# Se excluyen enteros aqui para tener una corrida "limpia"; si prefieres conservar
+# el resto de paquetes de cada uno, quita estas dos lineas y acepta esos 2 Failed puntuales.
+remnux.python3-packages.peepdf-3         # [PIP-TAG][CASCADA] stpyv8 wheel x86_64 rechazado por pip
+remnux.python3-packages.thug             # [PIP-TAG][CASCADA] stpyv8 wheel x86_64 rechazado por pip
 
-# Categoría: SALT-MOD (dependen de gem.installed/gem.removed,
-# no disponibles en Salt 3008.2)
-tools/origamindee.sls
-tools/pdnstool.sls
-tools/pedump.sls
+# ---- Grupo BUILD: fallos de compilacion desde código fuente en la corrida completa ----
+# No confirmados aun como "arm64-only"; algunos podrían arreglarse actualizando
+# herramientas de build (cmake, config.guess/config.sub) sin ser un límite real de arquitectura.
+remnux.python3-packages.peframe          # [BUILD] falla compilando extensión readline (config.guess desactualizado, no reconoce aarch64)
+remnux.python3-packages.qiling           # [BUILD] falla compilando keystone-engine (cmake no encontrado)
+remnux.python3-packages.pe-tree          # [BUILD] conflicto de dependencias pyqt5 (sin wheel arm64 disponible en el pin usado)
+remnux.python3-packages.vivisect         # [BUILD] pyqt5 5.15.7 falla al generar metadata (falta qmake / build system)
 
-# Categoría: NO-PKG (paquete ausente de los repos de Ubuntu;
-# no confirmado como problema de arquitectura, sino de disponibilidad
-# del paquete). Confirmados por nombre:
-tools/ghidra.sls
-tools/powershell.sls
-tools/burpsuite-community.sls
-tools/edb-debugger.sls
-tools/flare-floss.sls
-# --- HUECO: ~20 rutas NO-PKG adicionales sin path exacto documentado ---
-# (paquetes ausentes de los repos de Ubuntu detectados en la corrida
-# completa de remnux.addon, pendientes de listar aquí)
+# ---- Grupo NO-PKG: paquete no existe en los repos de Ubuntu para esta versión ----
+remnux.packages.libemu
+remnux.packages.baksmali
+remnux.packages.aeskeyfind
+remnux.packages.7zip
+remnux.packages.edb-debugger
+remnux.packages.xorstrings
+remnux.packages.bearparser
+remnux.tools.manalyze
+remnux.packages.signsrch
+remnux.packages.pycdc
+remnux.packages.powershell
+remnux.packages.portex
+remnux.packages.msoffice-crypt
+remnux.packages.flare-floss
+remnux.packages.binee
+remnux.packages.xorsearch
+remnux.packages.android-project-creator
+remnux.packages.sandfly-processdecloak
+remnux.packages.ilspy
+remnux.packages.ghidra
+remnux.packages.scdbg
+remnux.packages.evilclippy
+remnux.packages.rar
+remnux.packages.burpsuite-community
+remnux.tools.jd-gui
+remnux.packages.playwright
 
-# Categoría: NPM (fallo sin mensaje de error explícito capturado;
-# probablemente npm ausente o fallo silencioso del módulo npm.installed)
-javascript-tools/box-js.sls
-javascript-tools/js-deobfuscator.sls
-javascript-tools/jstillery.sls
-javascript-tools/webcrack.sls
-javascript-tools/opencode-ai.sls
-# --- HUECO: confirmar path exacto de playwright.sls y @remnux/mcp-server.sls ---
-# remnux.packages.nodejs deliberadamente NO excluido: falló en la
-# corrida completa sin mensaje de error capturado, pendiente de
-# investigar antes de decidir si se excluye (ver remnux/FINDINGS.md).
+# ---- Grupo SALT-MOD: módulo de estado no disponible en Salt 3008.2 ----
+remnux.rubygems.origamindee              # usa gem.removed/gem.installed
+remnux.rubygems.pdnstool                 # usa gem.installed
+remnux.rubygems.pedump                   # usa gem.installed
+
+# ---- Grupo npm sin mensaje de error explícito (probable falta de npm o fallo silencioso) ----
+remnux.node-packages.box-js
+remnux.node-packages.js-deobfuscator
+remnux.node-packages.jstillery
+remnux.node-packages.webcrack
+remnux.node-packages.opencode
+
+# ---- nodejs.pkg.installed dio Failed en la corrida completa: causa aun sin confirmar ----
+# OJO: excluir esto puede romper todo lo que dependa de nodejs (node-packages en general).
+# Se deja FUERA de la exclusión a propósito para que aparezca claramente en el próximo log
+# y se pueda investigar la causa real antes de decidir si excluirlo.
+# remnux.packages.nodejs                 # [SIN CLASIFICAR] investigar antes de excluir

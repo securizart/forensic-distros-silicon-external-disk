@@ -48,19 +48,25 @@ Additional failure categories beyond the 7 documented above:
 - npm failures with no explicit error (likely missing `npm` or a silent `npm.installed` module failure): `box-js`, `js-deobfuscator`, `JStillery`, `webcrack`, `playwright`, `opencode-ai`, `@remnux/mcp-server`.
 - Cascade `file.managed`/`archive.extracted` failures from earlier failed states (e.g. `ghidra-data-type.zip`).
 
-## Validated exclude-list (46 paths)
+## Validated exclude-list (45 active paths + 1 pending, not excluded)
 
-A 46-path `.sls` exclude-list was built which, applied on `state.apply remnux.addon` (`salt-call --local state.apply remnux.addon exclude=<46 paths>`), leaves the install at **0 `Failed`** on a clean VM run. Subsequent verification confirmed the 7 known-broken binaries (`cutter`, `redress`, `yr`, `docker-compose`, `die`, `diec`, `inspircd`) are **not** installed after applying the exclusion.
+`remnux/exclude-list.txt` holds the `.sls` paths (dotted-path, ready for Salt's `exclude=[...]`) which, applied on `state.apply remnux.addon`, leave the install at **0 `Failed`** on a clean VM run. Subsequent verification confirmed the 7 known-broken binaries (`cutter`, `redress`, `yr`, `docker-compose`, `die`, `diec`, `inspircd`) are **not** installed after applying the exclusion.
 
-Exclude-list breakdown by category:
+Breakdown by category (actual count from the file):
 
-- **2 loud**: `inspircd`, `detect-it-easy`
-- **4 silent**: `docker-compose`, `cutter`, `redress`, `yara-x`
-- **2 pip-tag**: `peepdf-3`, `thug` (both via the `install_stpyv8` macro)
-- **4 build-related, not confirmed as a hard arm64 limit**: `peframe`, `qiling`, `pe-tree`, `vivisect`
-- **3 Salt-module related** (rubygems, `gem.installed` unavailable in Salt 3008.2): `origamindee`, `pdnstool`, `pedump`
-- **~25 NO-PKG**: packages absent from Ubuntu's repos (not confirmed as an architecture issue)
-- **5 unclassified npm**
+- **2 LOUD** (amd64 `.deb` with unresolvable `:amd64` deps): `packages.inspircd`, `tools.detect-it-easy` (the latter with 10 unresolvable Qt5 `:amd64` deps).
+- **4 SILENT** (loose ELF x86-64 binary, `Exec format error` at runtime): `tools.docker-compose`, `tools.cutter`, `tools.redress`, `tools.yara-x` (pie).
+- **2 PIP-TAG / CASCADE** (`stpyv8`'s `manylinux_x86_64` wheel rejected by pip, invoked from these two `.sls`): `python3-packages.peepdf-3`, `python3-packages.thug`. `stpyv8` isn't an applicable `.sls` on its own, it only defines a Jinja macro; excluding these two whole files also drops the rest of the packages each one installs — alternative: don't exclude them and accept those 2 point `Failed` states if you want to keep the rest of each package.
+- **4 BUILD** (fails compiling from source; **not confirmed as a hard arm64 limit**, could potentially be fixed by updating build tools):
+  - `python3-packages.peframe`: fails compiling the `readline` extension — outdated `config.guess`, doesn't recognize `aarch64`.
+  - `python3-packages.qiling`: fails compiling `keystone-engine` — `cmake` not found.
+  - `python3-packages.pe-tree`: PyQt5 dependency conflict (no arm64 wheel available at the pinned version).
+  - `python3-packages.vivisect`: PyQt5 5.15.7 fails generating metadata (missing `qmake`/build system).
+- **3 SALT-MOD** (state module unavailable in Salt 3008.2, `gem.installed`/`gem.removed`): `rubygems.origamindee`, `rubygems.pdnstool`, `rubygems.pedump`.
+- **25 NO-PKG** (package absent from Ubuntu's repos for this version/arch): `libemu`, `baksmali`, `aeskeyfind`, `7zip`, `edb-debugger`, `xorstrings`, `bearparser`, `manalyze`, `signsrch`, `pycdc`, `powershell`, `portex`, `msoffice-crypt`, `flare-floss`, `binee`, `xorsearch`, `android-project-creator`, `sandfly-processdecloak`, `ilspy`, `ghidra`, `scdbg`, `evilclippy`, `rar`, `burpsuite-community`, `jd-gui`, `playwright`.
+- **5 NPM** (fails with no explicit error captured, likely missing `npm` or a silent `npm.installed` module failure): `node-packages.box-js`, `node-packages.js-deobfuscator`, `node-packages.jstillery`, `node-packages.webcrack`, `node-packages.opencode`.
+
+**`remnux.packages.nodejs`** is **deliberately left out** of the exclusion (commented out in the file): it failed on the full run with no confirmed cause, and excluding it blindly could drag down everything that depends on `nodejs` (all of `node-packages`). Investigating the real cause is still pending.
 
 `remnux.packages.nodejs` **deliberately not excluded** — it failed on the full run with no captured error message; pending investigation before deciding whether to exclude it.
 
