@@ -86,10 +86,13 @@ fi
 # =============================================================================
 
 install_docker_compose() {
-    echo "[1/6] docker-compose -> docker-compose-v2 (apt, arm64 nativo)"
-    sudo apt-get install -y docker-compose-v2
+    echo "[1/6] docker-compose -> docker-compose-plugin (ya instalado como dependencia de docker-ce, arm64 nativo)"
+    if [ ! -e /usr/libexec/docker/cli-plugins/docker-compose ]; then
+        echo "      AVISO: no se encuentra el plugin; instalando por si acaso."
+        sudo apt-get install -y docker-compose-plugin
+    fi
     sudo ln -sf /usr/libexec/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
-    echo "      Instalado. Prueba: docker-compose version"
+    echo "      Symlink creado. Prueba: docker-compose version  (o: docker compose version)"
 }
 
 install_cutter() {
