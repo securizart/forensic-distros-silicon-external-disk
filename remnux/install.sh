@@ -1,8 +1,20 @@
 #!/bin/bash
 #
-# install.sh — Instala REMnux sobre arm64 (Ubuntu Desktop 24.04 / Debian
-# Asahi) aplicando el exclude-list validado para dejar la corrida en
-# 0 estados "Failed".
+# install.sh — Ejecuta remnux.addon COMPLETO en arm64 (Ubuntu Desktop
+# 24.04 / Debian Asahi), sin exclude=.
+#
+# Por qué sin exclude=: usar exclude=[...] con los .sls conocidos como
+# rotos en arm64 hace que el COMPILADOR de Salt (masterless, 3008.2)
+# aborte antes de ejecutar nada, porque otros .sls tienen un
+# `require: sls: <el excluido>` y Salt valida esas referencias en
+# tiempo de compilación. Ver remnux/FINDINGS.md, sección "Por qué no
+# se usa exclude=", para el detalle y el log real que confirmó esto.
+#
+# Enfoque en su lugar: dejar que remnux.addon se aplique entero,
+# aceptando los ~120 estados "Failed" ya documentados (~88% de éxito),
+# y ejecutar después cleanup.sh para eliminar los binarios rotos que
+# SÍ quedan instalados de forma silenciosa (Salt los marca Succeeded
+# aunque el binario sea x86-64 y no ejecute en arm64).
 #
 # Requisitos previos (ver DEPENDENCIES.md):
 #   - Ubuntu/Debian arm64 con salida a internet
@@ -12,10 +24,9 @@
 #       cast install remnux/salt-states
 #     (cast clona el repo internamente; requiere `git` instalado)
 #
-set -euo pipefail
+set -uo pipefail
 
 SALT_STATES_DIR="${SALT_STATES_DIR:-$HOME/salt-states}"
-EXCLUDE_FILE="$(dirname "$0")/exclude-list.txt"
 LOG_FILE="${LOG_FILE:-$HOME/remnux-install-$(date +%Y%m%d-%H%M%S).log}"
 
 if [ ! -d "$SALT_STATES_DIR" ]; then
@@ -25,41 +36,31 @@ if [ ! -d "$SALT_STATES_DIR" ]; then
     exit 1
 fi
 
-if [ ! -f "$EXCLUDE_FILE" ]; then
-    echo "ERROR: no se encuentra $EXCLUDE_FILE"
-    exit 1
-fi
-
 echo "== Verificando arquitectura =="
 ARCH=$(sudo salt-call --local grains.get osarch --out=txt | awk -F': ' '{print $2}')
 echo "grains osarch = $ARCH"
 if [ "$ARCH" != "arm64" ] && [ "$ARCH" != "aarch64" ]; then
-    echo "AVISO: arquitectura detectada '$ARCH', este exclude-list se validó en arm64."
+    echo "AVISO: arquitectura detectada '$ARCH', este flujo se validó en arm64."
     read -r -p "¿Continuar de todas formas? [y/N] " ans
     [ "$ans" = "y" ] || [ "$ans" = "Y" ] || exit 1
 fi
 
-# Construye la lista de exclusión en formato YAML-list para salt.
-# exclude-list.txt ya está en dotted-path (p. ej. remnux.tools.cutter);
-# se recorta todo lo que vaya tras un '#' (comentario, inline o de línea
-# completa) y se ignoran líneas resultantes vacías.
-EXCLUDE_ITEMS=$(sed 's/#.*$//' "$EXCLUDE_FILE" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$' | paste -sd, -)
+echo "== Aplicando remnux.addon COMPLETO, sin exclude= (esto puede tardar ~20 min) =="
+echo "Se esperan del orden de ~120 estados fallidos conocidos (~88% de éxito)."
+echo "Al terminar, ejecuta ./cleanup.sh para eliminar los binarios rotos y"
+echo "./verify.sh para confirmar el resultado."
+echo ""
 
-echo "== Rutas excluidas (${EXCLUDE_ITEMS//,/$'\n'}) =="
-
-echo "== Aplicando remnux.addon (esto puede tardar ~20 min) =="
-sudo salt-call --local state.apply remnux.addon "exclude=[${EXCLUDE_ITEMS}]" \
+sudo salt-call --local state.apply remnux.addon \
     --state-output=changes --log-level=info 2>&1 | tee "$LOG_FILE"
 
+SUCCEEDED=$(grep -c 'Result: True' "$LOG_FILE" || true)
 FAILED=$(grep -c 'Result: False' "$LOG_FILE" || true)
 echo ""
 echo "== Resultado =="
 echo "Log completo en: $LOG_FILE"
+echo "Estados con Result: True  -> $SUCCEEDED"
 echo "Estados con Result: False -> $FAILED"
-
-if [ "$FAILED" -eq 0 ]; then
-    echo "OK: 0 estados fallidos. Ejecuta ./verify.sh para comprobar binarios."
-else
-    echo "AVISO: hay estados fallidos no cubiertos por el exclude-list actual."
-    echo "Revisa $LOG_FILE y añade las rutas correspondientes a exclude-list.txt."
-fi
+echo ""
+echo "Siguiente paso: sudo ./cleanup.sh   (elimina binarios rotos conocidos)"
+echo "Después:        ./verify.sh         (confirma que ya no están y que radare2 funciona)"

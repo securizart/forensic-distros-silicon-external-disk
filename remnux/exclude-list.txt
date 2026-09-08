@@ -1,5 +1,16 @@
 # exclude-list.txt
-# Lista de .sls de remnux/salt-states a excluir al aplicar remnux.addon en arm64.
+#
+# AVISO: este fichero YA NO se usa como argumento exclude= de
+# `state.apply` — usarlo así rompe la compilación del high-state de
+# Salt (ver remnux/FINDINGS.md, sección "Exclude-list: por qué se
+# abandonó como mecanismo de instalación", para el error real y la
+# explicación). Se conserva como documentación de referencia de los
+# puntos de fallo conocidos en la ejecución completa de
+# remnux.addon. La limpieza real de binarios rotos la hace
+# remnux/cleanup.sh después de una ejecución sin exclusiones.
+#
+# Lista de .sls de remnux/salt-states categorizados durante la
+# investigación de los ~120 fallos de la ejecución completa en arm64.
 # Formato: una ruta de sls por línea (dotted path). Líneas que empiezan por # se ignoran.
 # Categoría entre corchetes al final de cada comentario:
 #   [RUIDOSO]    Salt marca Failed; .deb amd64 con dependencias apt no instalables.

@@ -1,9 +1,10 @@
 #!/bin/bash
 #
-# verify.sh — Comprueba que los binarios amd64-only conocidos como
-# rotos en arm64 NO quedaron instalados tras aplicar install.sh, y que
-# los binarios sí soportados (radare2, vía la macro osarch.sls)
-# funcionan correctamente.
+# verify.sh — Ejecutar DESPUÉS de install.sh + cleanup.sh. Comprueba
+# que los binarios amd64-only conocidos como rotos en arm64 ya NO
+# están presentes (cleanup.sh los mueve a backup), y que los binarios
+# sí soportados (radare2, vía la macro osarch.sls) funcionan
+# correctamente.
 #
 set -uo pipefail
 
@@ -51,7 +52,7 @@ if command -v r2 >/dev/null 2>&1; then
         fail=1
     fi
 else
-    echo "  [WARN] radare2 no está instalado (¿excluido por error?)"
+    echo "  [WARN] radare2 no está instalado (revisar log de install.sh)"
 fi
 
 echo ""

@@ -2,7 +2,7 @@
 
 🇬🇧 [English version](FINDINGS.en.md)
 
-Ver también: [`DEPENDENCIES.md`](DEPENDENCIES.md) (dependencias del sistema, Cast, Salt), [`CAST-INSTALL.md`](CAST-INSTALL.md) (pasos concretos de instalación de Cast), [`install.sh`](install.sh) + [`exclude-list.txt`](exclude-list.txt) (instalación reproducible), [`verify.sh`](verify.sh) (verificación post-instalación).
+Ver también: [`DEPENDENCIES.md`](DEPENDENCIES.md) (dependencias del sistema, Cast, Salt), [`CAST-INSTALL.md`](CAST-INSTALL.md) (pasos concretos de instalación de Cast), [`install.sh`](install.sh) (instalación completa de `remnux.addon`), [`cleanup.sh`](cleanup.sh) (limpieza post-instalación de binarios amd64), [`verify.sh`](verify.sh) (verificación final), [`exclude-list.txt`](exclude-list.txt) (documentación de referencia de los fallos conocidos).
 
 ## Entorno de prueba
 
@@ -48,9 +48,26 @@ Categorías de fallo adicionales más allá de los 7 documentados arriba:
 - Fallos npm sin mensaje explícito (probablemente `npm` ausente o fallo silencioso del módulo `npm.installed`): `box-js`, `js-deobfuscator`, `JStillery`, `webcrack`, `playwright`, `opencode-ai`, `@remnux/mcp-server`.
 - Fallos en cascada de `file.managed`/`archive.extracted` derivados de estados previos fallidos (ej. `ghidra-data-type.zip`).
 
-## Exclude-list validada (45 rutas activas + 1 pendiente sin excluir)
+## Exclude-list: por qué se abandonó como mecanismo de instalación
 
-`remnux/exclude-list.txt` recoge las rutas `.sls` (en dotted-path, listas para `exclude=[...]` de Salt) que, aplicadas sobre `state.apply remnux.addon`, dejan la instalación en **0 `Failed`** en la corrida limpia sobre VM. Verificación posterior confirmó que los 7 binarios rotos conocidos (`cutter`, `redress`, `yr`, `docker-compose`, `die`, `diec`, `inspircd`) **no** quedan instalados tras aplicar la exclusión.
+**Hallazgo importante**: aplicar `state.apply remnux.addon` con `exclude=[...]` (usando el exclude-list de abajo) **no funciona** — falla en la fase de compilación del *high-state*, antes de tocar un solo paquete, con errores del tipo:
+
+```
+Data failed to compile:
+    Referenced state does not exist for requisite [require: (sls: remnux.tools.docker-compose)] in state [docker-ce] in SLS [remnux.packages.docker]
+    Referenced state does not exist for requisite [require: (sls: remnux.packages.ghidra)] in state [/usr/local/src/remnux/files/ghidra-data-type.zip] in SLS [remnux.config.ghidra]
+    ... (19 errores de este tipo, confirmados en ejecución real)
+```
+
+Cuando se excluye un `.sls` con `exclude=`, Salt lo saca del árbol de estados por completo — pero otros `.sls` que tienen un `require: sls: <el excluido>` siguen apuntando a él, y el compilador de Salt en modo masterless (3008.2) valida esas referencias en tiempo de compile y aborta si el objetivo ya no existe. Esto ocurre incluso con estados sin relación aparente con arquitectura: `docker-ce` requiere `remnux.tools.docker-compose` (excluido por SILENCIOSO), `remnux.config.ghidra` requiere `remnux.packages.ghidra` (excluido por NO-PKG), etc. El resultado es que **no se instala nada en absoluto**, ni siquiera paquetes sin ningún problema de arquitectura como radare2.
+
+**Enfoque actual (`install.sh` / `cleanup.sh` / `verify.sh`)**: en vez de excluir `.sls`, se deja correr `remnux.addon` completo (aceptando los ~120 `Failed` ya documentados más abajo) y se limpia después con `cleanup.sh`, que localiza y retira los binarios SILENCIOSOS (ELF x86-64) que Salt marca como instalados con éxito pero son inservibles en arm64. Los `.sls` RUIDOSO (`inspircd`, `detect-it-easy`) no dejan binario a medio instalar porque apt/dpkg aborta la transacción completa por dependencias `:amd64` no resolubles — `cleanup.sh` solo comprueba que `apt` no haya quedado en estado "held broken packages" tras esos intentos.
+
+`exclude-list.txt` se conserva como **documentación de referencia** (categorización de los ~46 puntos de fallo conocidos), no como input funcional de `install.sh`.
+
+## Exclude-list conocida (documentación, ya no se usa como `exclude=`)
+
+`remnux/exclude-list.txt` recoge las rutas `.sls` (en dotted-path) categorizadas durante la investigación de los ~120 fallos de la ejecución completa de `remnux.addon`. **Ya no se pasa a `state.apply` como `exclude=`** (ver explicación arriba); se mantiene como referencia de qué falla y por qué. La limpieza real de binarios rotos la hace `cleanup.sh` tras una ejecución completa sin exclusiones.
 
 Desglose por categoría (recuento real del fichero):
 

@@ -2,7 +2,7 @@
 
 🇪🇸 [Versión en español](FINDINGS.md)
 
-See also: [`DEPENDENCIES.en.md`](DEPENDENCIES.en.md) (system dependencies, Cast, Salt), [`CAST-INSTALL.en.md`](CAST-INSTALL.en.md) (concrete Cast install steps), [`install.sh`](install.sh) + [`exclude-list.txt`](exclude-list.txt) (reproducible install), [`verify.sh`](verify.sh) (post-install verification).
+See also: [`DEPENDENCIES.en.md`](DEPENDENCIES.en.md) (system dependencies, Cast, Salt), [`CAST-INSTALL.en.md`](CAST-INSTALL.en.md) (concrete Cast install steps), [`install.sh`](install.sh) (full `remnux.addon` install), [`cleanup.sh`](cleanup.sh) (post-install cleanup of amd64 binaries), [`verify.sh`](verify.sh) (final verification), [`exclude-list.txt`](exclude-list.txt) (reference documentation of known failures).
 
 ## Test environment
 
@@ -48,7 +48,24 @@ Additional failure categories beyond the 7 documented above:
 - npm failures with no explicit error (likely missing `npm` or a silent `npm.installed` module failure): `box-js`, `js-deobfuscator`, `JStillery`, `webcrack`, `playwright`, `opencode-ai`, `@remnux/mcp-server`.
 - Cascade `file.managed`/`archive.extracted` failures from earlier failed states (e.g. `ghidra-data-type.zip`).
 
-## Validated exclude-list (45 active paths + 1 pending, not excluded)
+## Exclude-list: why it was abandoned as an install mechanism
+
+**Important finding**: applying `state.apply remnux.addon` with `exclude=[...]` (using the exclude-list below) **doesn't work** — it fails during the *high-state* compile phase, before touching a single package, with errors like:
+
+```
+Data failed to compile:
+    Referenced state does not exist for requisite [require: (sls: remnux.tools.docker-compose)] in state [docker-ce] in SLS [remnux.packages.docker]
+    Referenced state does not exist for requisite [require: (sls: remnux.packages.ghidra)] in state [/usr/local/src/remnux/files/ghidra-data-type.zip] in SLS [remnux.config.ghidra]
+    ... (19 errors of this kind, confirmed on a real run)
+```
+
+When a `.sls` is excluded with `exclude=`, Salt removes it entirely from the state tree — but other `.sls` files with a `require: sls: <the excluded one>` still point at it, and Salt's masterless compiler (3008.2) validates those references at compile time and aborts if the target no longer exists. This happens even for states with no apparent architecture connection: `docker-ce` requires `remnux.tools.docker-compose` (excluded as SILENT), `remnux.config.ghidra` requires `remnux.packages.ghidra` (excluded as NO-PKG), etc. The result is that **nothing gets installed at all**, not even packages with no architecture issue whatsoever, like radare2.
+
+**Current approach (`install.sh` / `cleanup.sh` / `verify.sh`)**: instead of excluding `.sls` files, `remnux.addon` is run in full (accepting the ~120 `Failed` states documented below) and cleaned up afterwards with `cleanup.sh`, which finds and removes the SILENT binaries (x86-64 ELF) that Salt marks as successfully installed but are useless on arm64. LOUD `.sls` files (`inspircd`, `detect-it-easy`) don't leave a half-installed binary because apt/dpkg aborts the whole transaction over unresolvable `:amd64` dependencies — `cleanup.sh` only checks that `apt` wasn't left in a "held broken packages" state after those attempts.
+
+`exclude-list.txt` is kept as **reference documentation** (categorization of the ~46 known failure points), not as a functional input to `install.sh`.
+
+## Known exclude-list (documentation, no longer used as `exclude=`)
 
 `remnux/exclude-list.txt` holds the `.sls` paths (dotted-path, ready for Salt's `exclude=[...]`) which, applied on `state.apply remnux.addon`, leave the install at **0 `Failed`** on a clean VM run. Subsequent verification confirmed the 7 known-broken binaries (`cutter`, `redress`, `yr`, `docker-compose`, `die`, `diec`, `inspircd`) are **not** installed after applying the exclusion.
 
