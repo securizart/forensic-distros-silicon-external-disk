@@ -35,12 +35,12 @@ remnux.tools.yara-x                      # [SILENCIOSO] ELF x86-64 pie, Exec for
 # stpyv8 no es un .sls independiente aplicable (solo define un macro Jinja),
 # se invoca desde peepdf-3.sls y thug.sls. Al fallar el pip.installed del wheel,
 # ambos .sls quedan con ese estado en Failed pero el resto de cada uno sí se aplica.
-# Se excluyen enteros aqui para tener una corrida "limpia"; si prefieres conservar
+# Se excluyen enteros aqui para tener una ejecución "limpia"; si prefieres conservar
 # el resto de paquetes de cada uno, quita estas dos lineas y acepta esos 2 Failed puntuales.
 remnux.python3-packages.peepdf-3         # [PIP-TAG][CASCADA] stpyv8 wheel x86_64 rechazado por pip
 remnux.python3-packages.thug             # [PIP-TAG][CASCADA] stpyv8 wheel x86_64 rechazado por pip
 
-# ---- Grupo BUILD: fallos de compilacion desde código fuente en la corrida completa ----
+# ---- Grupo BUILD: fallos de compilacion desde código fuente en la ejecución completa ----
 # No confirmados aun como "arm64-only"; algunos podrían arreglarse actualizando
 # herramientas de build (cmake, config.guess/config.sub) sin ser un límite real de arquitectura.
 remnux.python3-packages.peframe          # [BUILD] falla compilando extensión readline (config.guess desactualizado, no reconoce aarch64)
@@ -88,7 +88,7 @@ remnux.node-packages.jstillery
 remnux.node-packages.webcrack
 remnux.node-packages.opencode
 
-# ---- nodejs.pkg.installed dio Failed en la corrida completa: causa aun sin confirmar ----
+# ---- nodejs.pkg.installed dio Failed en la ejecución completa: causa aun sin confirmar ----
 # OJO: excluir esto puede romper todo lo que dependa de nodejs (node-packages en general).
 # Se deja FUERA de la exclusión a propósito para que aparezca claramente en el próximo log
 # y se pueda investigar la causa real antes de decidir si excluirlo.

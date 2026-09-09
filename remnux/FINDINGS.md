@@ -36,7 +36,7 @@ pip valida los tags de plataforma antes de instalar y rechaza con un mensaje cla
 - `stpyv8.sls`: wheel `manylinux_2_31_x86_64`; probado indirectamente vía `peepdf-3.sls`/`thug.sls`, que invocan la macro `install_stpyv8`.
 - Bug aparte no relacionado con arquitectura: `STPyV8` en PyPI falla al compilar desde sdist por `ModuleNotFoundError: No module named settings` en su `setup.py`.
 
-## Corrida completa (`remnux.addon`, sin exclusiones)
+## Ejecución completa (`remnux.addon`, sin exclusiones)
 
 ~88% instala correctamente: **889/1009 estados con éxito, 120 fallos** (~20 min).
 
@@ -48,7 +48,26 @@ Categorías de fallo adicionales más allá de los 7 documentados arriba:
 - Fallos npm sin mensaje explícito (probablemente `npm` ausente o fallo silencioso del módulo `npm.installed`): `box-js`, `js-deobfuscator`, `JStillery`, `webcrack`, `playwright`, `opencode-ai`, `@remnux/mcp-server`.
 - Fallos en cascada de `file.managed`/`archive.extracted` derivados de estados previos fallidos (ej. `ghidra-data-type.zip`).
 
-## Exclude-list: por qué se abandonó como mecanismo de instalación
+## Flujo `install.sh` → `cleanup.sh` → `verify.sh` — validado empíricamente en VM
+
+Confirmado de punta a punta en una ejecución real:
+
+- **`install.sh`**: `remnux.addon` completo → `Succeeded: 889 (changed=713)`, `Failed: 120`, `Total: 1009` — coincide exactamente con la línea base documentada arriba. Los 6 binarios se comportan tal como estaba catalogado (`cutter`/`redress`/`docker-compose`/`yr` con `Result: True` pese a ser x86-64; `inspircd`/`detect-it-easy` con `Result: False` por `"held broken packages"`).
+- **`cleanup.sh`**: encontró un bug real en la detección de arquitectura — la cadena `x86-64` aparece **dos veces** en la salida de `file` para binarios dinámicamente enlazados (una en el campo de arquitectura, otra en `interpreter /lib64/ld-linux-x86-64.so.2`), lo que rompía la comparación de string exacta y dejaba sin mover a backup los binarios con enlace dinámico (`cutter`, `redress`) mientras sí funcionaba por casualidad con los enlazados estáticamente (`docker-compose`, `yr`). Corregido usando `grep -q` (booleano) en vez de comparar el string capturado.
+- **`verify.sh`**: tras el fix, confirma correctamente los 7 binarios ausentes y radare2 funcionando.
+
+## Alternativas nativas arm64 para los binarios rotos — confirmadas en VM
+
+`verify.sh`, sin necesidad de flags, instala automáticamente las alternativas confirmadas tras la verificación:
+
+| Binario | Método | Estado |
+|---|---|---|
+| `docker-compose` | `docker-compose-plugin` ya viene como dependencia de `docker-ce` (arm64 nativo); solo hace falta el symlink | ✅ Confirmado (`docker-compose version` → `v5.5.1`) |
+| `redress` | `golang-go` (apt) + `go install github.com/goretk/redress@latest` | ✅ Confirmado (`redress info` sobre sí mismo → `GOARCH arm64`, `GOOS linux`). El subcomando `version` sale en blanco porque el proyecto inyecta esos valores vía `-ldflags` en su Makefile oficial, que un `go install` normal no aplica — cosmético, no funcional. |
+| `yr` (yara-x) | **rustup**, no el `cargo` de apt — Ubuntu 24.04 trae rustc 1.75.0 y `yara-x-cli` exige ≥1.93. rustup instala un toolchain aislado en `$HOME/.cargo` sin tocar apt | ✅ Confirmado (`yr --version` → `yara-x-cli 1.20.0`) |
+| `die`/`diec` | Flatpak oficial (`io.github.horsicq.detect-it-easy`, Flathub, `aarch64` soportado) | ✅ Confirmado (arranca la GUI Qt real; avisos `qt.core.qobject.connect` son del propio DIE, no de arquitectura) |
+| `cutter` | Repo OBS oficial de RizinOrg (`cutter-re`) | ❌ Sin alternativa confirmada — build `xUbuntu_22.04` depende de `libpython3.10` (Ubuntu 24.04 trae 3.12); la carpeta `xUbuntu_24.04` del mismo repo existe pero no publica el paquete (`E: Unable to locate package cutter-re`). Pendiente: compilar desde fuente o probar el AppImage x86_64 vía `box64`. |
+| `inspircd` | Ubuntu universe arm64 solo trae v3.17.0 (2 majors por debajo de la v4.7.0 que pide remnux) | Deliberadamente fuera del flujo automático — downgrade, no sustituto limpio. Instalable solo con `./verify.sh --install-inspircd-downgrade`, con confirmación explícita. |
 
 **Hallazgo importante**: aplicar `state.apply remnux.addon` con `exclude=[...]` (usando el exclude-list de abajo) **no funciona** — falla en la fase de compilación del *high-state*, antes de tocar un solo paquete, con errores del tipo:
 
@@ -83,9 +102,9 @@ Desglose por categoría (recuento real del fichero):
 - **25 NO-PKG** (paquete ausente de los repos de Ubuntu para esta versión/arch): `libemu`, `baksmali`, `aeskeyfind`, `7zip`, `edb-debugger`, `xorstrings`, `bearparser`, `manalyze`, `signsrch`, `pycdc`, `powershell`, `portex`, `msoffice-crypt`, `flare-floss`, `binee`, `xorsearch`, `android-project-creator`, `sandfly-processdecloak`, `ilspy`, `ghidra`, `scdbg`, `evilclippy`, `rar`, `burpsuite-community`, `jd-gui`, `playwright`.
 - **5 NPM** (fallo sin mensaje de error explícito capturado, probable ausencia de `npm` o fallo silencioso del módulo `npm.installed`): `node-packages.box-js`, `node-packages.js-deobfuscator`, `node-packages.jstillery`, `node-packages.webcrack`, `node-packages.opencode`.
 
-**`remnux.packages.nodejs`** se deja **deliberadamente fuera** de la exclusión (comentado en el fichero): falló en la corrida completa sin causa confirmada, y excluirlo a ciegas podría arrastrar todo lo que depende de `nodejs` (todo `node-packages`). Queda pendiente investigar la causa real antes de decidir.
+**`remnux.packages.nodejs`** se deja **deliberadamente fuera** de la exclusión (comentado en el fichero): falló en la ejecución completa sin causa confirmada, y excluirlo a ciegas podría arrastrar todo lo que depende de `nodejs` (todo `node-packages`). Queda pendiente investigar la causa real antes de decidir.
 
-`remnux.packages.nodejs` **deliberadamente no excluido** — falló en la corrida completa sin mensaje de error capturado; pendiente de investigar antes de decidir si se excluye.
+`remnux.packages.nodejs` **deliberadamente no excluido** — falló en la ejecución completa sin mensaje de error capturado; pendiente de investigar antes de decidir si se excluye.
 
 ## Pruebas de herramientas amd64 sobre arm64 (investigación externa, contrastar solo pasos con salida real de terminal)
 

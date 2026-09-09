@@ -23,7 +23,7 @@ Validating each forensic distro on arm64 needs its own test cycle (VM, snapshots
 
 Full detail: [`sift/FINDINGS.md`](sift/FINDINGS.md)
 
-### 🟡 REMnux — ~88% validated
+### 🟡 REMnux — ~88% validated, with native alternatives for 4/6 broken binaries
 Full `state.apply` on `remnux.addon`: **889/1009 states succeeded (88%)**, 120 failures.
 
 Three confirmed failure patterns:
@@ -31,7 +31,7 @@ Three confirmed failure patterns:
 2. **Silent** (loose binary/AppImage/tarball, no dpkg involved): `docker-compose.sls`, `cutter.sls`, `redress.sls`, `yara-x.sls` — Salt reports `Succeeded` but the binary throws `Exec format error` when run.
 3. **Explicit** (pip wheel tags): `stpyv8.sls` (via `peepdf-3.sls`/`thug.sls`) — pip rejects the wheel with `not a supported wheel on this platform`.
 
-A reproducible 46-path exclude-list has been built which, applied on top of `remnux.addon`, leaves the install at 0 `Failed` on a clean run. Full list detail and its category breakdown in [`remnux/FINDINGS.md`](remnux/FINDINGS.md).
+Install flow **empirically validated on a VM**: `install.sh` (full `remnux.addon` run, no exclusions) → `cleanup.sh` (removes the SILENT binaries) → `verify.sh` (confirms the result and, with no flags needed, automatically installs the confirmed native arm64 alternatives for `docker-compose`, `redress`, `yr` and `die`). `cutter` still has no confirmed native alternative; `inspircd` only installs behind an explicit flag, since it's a version downgrade, not a clean substitute.
 
 Still not fully triaged: ~25 `NO-PKG` packages (missing from Ubuntu's repos, not necessarily an architecture issue) and 5 npm packages (`box-js`, `js-deobfuscator`, `jstillery`, `webcrack`, `opencode`) with no captured error message.
 

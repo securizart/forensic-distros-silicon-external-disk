@@ -48,7 +48,26 @@ Additional failure categories beyond the 7 documented above:
 - npm failures with no explicit error (likely missing `npm` or a silent `npm.installed` module failure): `box-js`, `js-deobfuscator`, `JStillery`, `webcrack`, `playwright`, `opencode-ai`, `@remnux/mcp-server`.
 - Cascade `file.managed`/`archive.extracted` failures from earlier failed states (e.g. `ghidra-data-type.zip`).
 
-## Exclude-list: why it was abandoned as an install mechanism
+## `install.sh` → `cleanup.sh` → `verify.sh` flow — empirically validated on a VM
+
+Confirmed end-to-end on a real run:
+
+- **`install.sh`**: full `remnux.addon` → `Succeeded: 889 (changed=713)`, `Failed: 120`, `Total: 1009` — matches the documented baseline above exactly. All 6 binaries behave exactly as catalogued (`cutter`/`redress`/`docker-compose`/`yr` with `Result: True` despite being x86-64; `inspircd`/`detect-it-easy` with `Result: False` due to `"held broken packages"`).
+- **`cleanup.sh`**: uncovered a real bug in the architecture detection — the string `x86-64` appears **twice** in `file`'s output for dynamically-linked binaries (once in the architecture field, once in `interpreter /lib64/ld-linux-x86-64.so.2`), which broke the exact-string comparison and left dynamically-linked binaries (`cutter`, `redress`) unmoved while statically-linked ones (`docker-compose`, `yr`) happened to work by chance. Fixed by switching to a boolean `grep -q` check instead of comparing the captured string.
+- **`verify.sh`**: after the fix, correctly confirms all 7 binaries absent and radare2 working.
+
+## Native arm64 alternatives for the broken binaries — confirmed on a VM
+
+`verify.sh`, with no flags needed, automatically installs the confirmed alternatives after verification:
+
+| Binary | Method | Status |
+|---|---|---|
+| `docker-compose` | `docker-compose-plugin` already ships as a `docker-ce` dependency (native arm64); only a symlink is needed | ✅ Confirmed (`docker-compose version` → `v5.5.1`) |
+| `redress` | `golang-go` (apt) + `go install github.com/goretk/redress@latest` | ✅ Confirmed (`redress info` on itself → `GOARCH arm64`, `GOOS linux`). The `version` subcommand prints blank because the project injects those values via `-ldflags` in its official Makefile, which a plain `go install` doesn't apply — cosmetic, not functional. |
+| `yr` (yara-x) | **rustup**, not apt's `cargo` — Ubuntu 24.04 ships rustc 1.75.0 and `yara-x-cli` requires ≥1.93. rustup installs an isolated toolchain in `$HOME/.cargo` without touching apt | ✅ Confirmed (`yr --version` → `yara-x-cli 1.20.0`) |
+| `die`/`diec` | Official Flatpak (`io.github.horsicq.detect-it-easy`, Flathub, `aarch64` supported) | ✅ Confirmed (launches the real Qt GUI; the `qt.core.qobject.connect` warnings come from DIE itself, not from architecture) |
+| `cutter` | RizinOrg's official OBS repo (`cutter-re`) | ❌ No confirmed alternative — the `xUbuntu_22.04` build depends on `libpython3.10` (Ubuntu 24.04 ships 3.12); the `xUbuntu_24.04` folder of the same repo exists but doesn't publish the package (`E: Unable to locate package cutter-re`). Pending: build from source or try the x86_64 AppImage via `box64`. |
+| `inspircd` | Ubuntu universe arm64 only has v3.17.0 (2 majors behind the v4.7.0 remnux requires) | Deliberately left out of the automatic flow — a downgrade, not a clean substitute. Only installable with `./verify.sh --install-inspircd-downgrade`, with explicit confirmation. |
 
 **Important finding**: applying `state.apply remnux.addon` with `exclude=[...]` (using the exclude-list below) **doesn't work** — it fails during the *high-state* compile phase, before touching a single package, with errors like:
 

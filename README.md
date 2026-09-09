@@ -23,7 +23,7 @@ Validar cada distro forense en arm64 requiere un ciclo de pruebas propio (VM, sn
 
 Detalle completo: [`sift/FINDINGS.md`](sift/FINDINGS.md)
 
-### 🟡 REMnux — validado al ~88%
+### 🟡 REMnux — validado al ~88%, con alternativas nativas para 4/6 binarios rotos
 `state.apply` completo sobre `remnux.addon`: **889/1009 estados con éxito (88%)**, 120 fallos.
 
 Tres patrones de fallo confirmados:
@@ -31,7 +31,7 @@ Tres patrones de fallo confirmados:
 2. **Silencioso** (binario/AppImage/tarball suelto sin dpkg): `docker-compose.sls`, `cutter.sls`, `redress.sls`, `yara-x.sls` — Salt marca `Succeeded` pero el binario da `Exec format error` al ejecutarlo.
 3. **Explícito** (pip wheel tags): `stpyv8.sls` (vía `peepdf-3.sls`/`thug.sls`) — pip rechaza el wheel con `not a supported wheel on this platform`.
 
-Se ha construido una exclude-list reproducible de 46 rutas que, aplicada sobre `remnux.addon`, deja la instalación en 0 `Failed` en la corrida limpia. Detalle completo de la lista y su desglose por categoría en [`remnux/FINDINGS.md`](remnux/FINDINGS.md).
+Flujo de instalación **validado empíricamente en VM**: `install.sh` (ejecución completa de `remnux.addon`, sin exclusiones) → `cleanup.sh` (retira los binarios SILENCIOSO) → `verify.sh` (confirma el resultado e instala automáticamente, sin flags, las alternativas nativas arm64 ya confirmadas para `docker-compose`, `redress`, `yr` y `die`). `cutter` sigue sin alternativa nativa confirmada; `inspircd` solo se instala bajo flag explícito, por ser un downgrade de versión que no es un sustituto limpio.
 
 Pendiente sin clasificar del todo: ~25 paquetes `NO-PKG` (ausentes de los repos de Ubuntu, no necesariamente problema de arquitectura) y 5 paquetes npm (`box-js`, `js-deobfuscator`, `jstillery`, `webcrack`, `opencode`) sin mensaje de error capturado.
 
