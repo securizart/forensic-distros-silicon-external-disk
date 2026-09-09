@@ -93,6 +93,27 @@ Desglose por categoría (recuento real del fichero):
 - **Docker con emulación multiarch**: CONFIRMADO funcionando para herramientas de terminal. Clave: `multiarch/qemu-user-static` está obsoleto y su script de registro es solo amd64; usar `tonistiigi/binfmt` (`docker run --rm --privileged tonistiigi/binfmt --install all`). Confirmado: `sudo docker run --platform linux/amd64 -it --rm -v $(pwd):/home/nonroot/workdir remnux/radare2` levanta una sesión real de radare2 con desensamblado correcto.
 - **Contenedores GUI (Cutter, Ghidra)**: SIN RESOLVER — REMnux no publica estas como imágenes Docker independientes, son subcomandos de `remnux/remnux-distro`. Todos los intentos con X11 forwarding siguen dando `Exec format error` en `/usr/local/bin/cutter`. Ejecutar el AppImage de Cutter vía FEX-Emu es especulativo y sin probar.
 
-## Pendiente
+## Flujo `install.sh` → `cleanup.sh` → `verify.sh` — validado en real
 
-Clasificación fina de los ~120 fallos totales (arm64-específico vs. problema general de repo/versión de Salt), investigación de `remnux.packages.nodejs`, enfoque híbrido Cast/Docker para las herramientas GUI amd64-only que no se puedan arreglar a nivel de Salt states.
+Probado de punta a punta en la VM (no solo diseñado en teoría):
+
+- `install.sh`: ejecución completa de `remnux.addon` sin `exclude=` → **889/1009 estados con éxito, 120 fallos**, coincide exactamente con la línea base documentada más arriba.
+- `cleanup.sh`: localizó y movió a backup los binarios SILENCIOSO (`cutter`, `redress`, `docker-compose`, `yr`), y confirmó que `apt` no quedó en estado roto tras los 2 RUIDOSO.
+- `verify.sh`: confirmó los 7 puntos de control en verde tras la limpieza.
+
+**Bug real encontrado y corregido durante la validación**: la cadena `x86-64` aparece dos veces en la salida de `file` para binarios enlazados dinámicamente (una en el campo de arquitectura, otra dentro de `interpreter /lib64/ld-linux-x86-64.so.2`). La detección original comparaba `elf_arch = "x86-64"` como string exacto tras un `grep -oE`, lo que fallaba silenciosamente para binarios dinámicos (`cutter`, `redress`) porque la variable terminaba conteniendo dos líneas en vez de una. Corregido usando `grep -qiE` (comprobación booleana) en vez de comparación de string exacta, en `verify.sh` y `cleanup.sh`.
+
+## Alternativas nativas arm64 para los 6 binarios problemáticos
+
+`verify.sh --install-alternatives` intenta instalar un sustituto nativo arm64 para cada uno, usando el método que corresponde a cada caso (para no romper dependencias): apt nativo, repo oficial del proyecto, toolchain aislada, o Flatpak. Estado confirmado tras varias iteraciones:
+
+| Binario | Alternativa | Estado | Notas |
+|---|---|---|---|
+| `docker-compose` | `docker-compose-plugin` (ya viene como dependencia de `docker-ce`, arm64 nativo) + symlink | ✅ Confirmado (`docker-compose version` → `v5.5.1`) | No hace falta instalar nada extra, solo el symlink |
+| `redress` | `golang-go` (apt) + `go install github.com/goretk/redress@latest` | ✅ Confirmado (`redress info` sobre sí mismo → `OS EM_AARCH64`, `GOARCH arm64`) | El subcomando `version` sale en blanco porque `go install` no pasa los `-ldflags` que el `Makefile` del proyecto usa para inyectar la versión — cosmético, no afecta a la funcionalidad |
+| `yr` (yara-x) | `rustup` (toolchain Rust aislado en `$HOME`, **no** el `cargo`/`rustc` de apt) + `cargo install yara-x-cli` | ✅ Confirmado (`yr --version` → `yara-x-cli 1.20.0`) | El `cargo`/`rustc` de los repos de Ubuntu 24.04 es 1.75.0; `yara-x-cli` exige rustc ≥ 1.93 — falla con el cargo de apt, por eso hace falta `rustup` |
+| `die`/`diec` | Flatpak oficial (`io.github.horsicq.detect-it-easy`, Flathub) + wrapper en `/usr/local/bin/die` | ✅ Confirmado (arranca la GUI Qt real; los avisos `qt.core.qobject.connect` son ruido interno de la propia app, no de arquitectura) | No confirmado si el Flatpak expone también `diec` (variante consola) como comando separado |
+| `inspircd` | Ubuntu universe arm64 v3.17.0 | ⛔ Descartado a propósito | Dos majors por debajo de la v4.7.0 que pide remnux; no es sustituto limpio, requiere confirmación manual explícita (`--install-inspircd-downgrade`) |
+| `cutter` | Repo OBS oficial de RizinOrg | ❌ Sin alternativa nativa confirmada | Probado `xUbuntu_22.04` (falla: depende de `libpython3.10`, Ubuntu 24.04 trae `libpython3.12`) y `xUbuntu_24.04` (falla: `E: Unable to locate package cutter-re`, esa carpeta del repo no parece publicar el paquete). Pendiente de decidir entre compilar desde fuente o probar el AppImage x86_64 vía `box64`/FEX-Emu |
+
+Un detalle de `verify.sh` a tener en cuenta al leer sus resultados: distingue entre binario ELF x86-64 (roto, `[MAL]`), ELF arm64 (bien, `[INFO]`), y cualquier otra cosa que no sea ELF — como el symlink de `docker-compose` o el wrapper de shell de `die` — que se trata como `[INFO]`/OK, no como sospechoso, ya que esas alternativas son intencionalmente scripts o symlinks, no binarios nativos por sí mismos.

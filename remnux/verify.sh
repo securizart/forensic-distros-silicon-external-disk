@@ -36,9 +36,11 @@ for name in "${!BROKEN_BINARIES[@]}"; do
         fail=1
     elif echo "$elf_out" | grep -qiE 'aarch64|arm64'; then
         echo "  [INFO] $name: instalado en $path y SÍ es arm64 (¿parche upstream? revisar)"
-    else
-        echo "  [WARN] $name: instalado en $path, arquitectura no determinada ($elf_out)"
+    elif echo "$elf_out" | grep -qi 'elf'; then
+        echo "  [WARN] $name: instalado en $path, ELF de arquitectura no reconocida ($elf_out)"
         fail=1
+    else
+        echo "  [INFO] $name: instalado en $path como script/wrapper, no ELF ($elf_out) — asumido OK"
     fi
 done
 
@@ -65,8 +67,12 @@ fi
 # =============================================================================
 # Alternativas nativas arm64 para los binarios rotos
 # =============================================================================
-# NO se ejecutan solas. verify.sh sin argumentos solo verifica (arriba).
-# Para instalar las alternativas: ./verify.sh --install-alternatives
+# Se ejecutan SIEMPRE, sin necesidad de flags: tras la verificación de
+# arriba, este script instala directamente docker-compose, redress, yr
+# y die (los 4 confirmados funcionando). cutter se omite por defecto
+# (sin alternativa nativa confirmada); usa --with-cutter para intentarlo
+# igualmente. inspircd solo se instala con --install-inspircd-downgrade,
+# porque es un downgrade de versión, no un sustituto limpio.
 #
 # Cada binario usa el método que le corresponde para no arrastrar
 # dependencias rotas ni pisar paquetes del sistema:
@@ -174,21 +180,28 @@ WRAPPER
 
 install_arm64_alternatives() {
     install_docker_compose
-    install_cutter
     install_redress
     install_yara_x
     install_detect_it_easy
+    echo ""
+    echo "cutter: OMITIDO — sin alternativa nativa arm64 confirmada todavía"
+    echo "(repo RizinOrg probado en xUbuntu_22.04 y xUbuntu_24.04, ambos fallan)."
+    echo "Para intentar instalarlo de todos modos: ./verify.sh --with-cutter"
     echo ""
     echo "inspircd NO incluido automáticamente (downgrade, no sustituto limpio)."
     echo "Para intentarlo: ./verify.sh --install-inspircd-downgrade"
 }
 
 case "${1:-}" in
-    --install-alternatives)
-        install_arm64_alternatives
-        ;;
     --install-inspircd-downgrade)
         install_inspircd_downgrade
+        ;;
+    --with-cutter)
+        install_cutter
+        install_arm64_alternatives
+        ;;
+    *)
+        install_arm64_alternatives
         ;;
 esac
 
