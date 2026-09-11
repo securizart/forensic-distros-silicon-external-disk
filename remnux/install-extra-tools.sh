@@ -23,6 +23,7 @@ mkdir -p "$WORKDIR"
 
 # =============================================================================
 # Resueltos SIN MATICES (funcionan al 100% en arm64, verificado en la práctica)
+# 20 de ~24 candidatos NO-PKG de REMnux resueltos. Ver FINDINGS-extra-tools-arm64.md
 # =============================================================================
 
 install_powershell() {
@@ -201,6 +202,72 @@ install_signsrch() {
     echo "      descarga aparte de http://aluigi.org/mytoolz/signsrch.sig.zip"
 }
 
+install_ilspycmd() {
+    echo "[ilspycmd] herramienta dotnet (ICSharpCode.ILSpy), requiere .NET SDK 8"
+    sudo apt-get install -y dotnet-sdk-8.0 2>/dev/null \
+        || { wget -q https://dot.net/v1/dotnet-install.sh -O "$WORKDIR/dotnet-install.sh" \
+             && bash "$WORKDIR/dotnet-install.sh" --channel 8.0; }
+    export PATH="$PATH:$HOME/.dotnet:$HOME/.dotnet/tools"
+    # La resolución "sin versión" puede fallar por metadata NuGet incompleta -
+    # se fija una versión conocida-buena directamente.
+    dotnet nuget locals all --clear >/dev/null 2>&1 || true
+    dotnet tool install --global ilspycmd --version 9.1.0.7988 \
+        || dotnet tool update --global ilspycmd --version 9.1.0.7988 --allow-downgrade
+    echo "      Prueba: ilspycmd --version  (asegúrate de tener \$HOME/.dotnet/tools en el PATH)"
+}
+
+install_flare_floss() {
+    echo "[flare-floss] Mandiant FLARE team, vía pip (incluye vivisect, sin problema en arm64)"
+    pip install flare-floss --break-system-packages
+    echo "      Prueba: floss --help  (asegúrate de tener \$HOME/.local/bin en el PATH)"
+}
+
+install_evilclippy() {
+    echo "[evilclippy] compilado con Mono (outflanknl/EvilClippy, no distribuye binario)"
+    sudo apt-get install -y mono-complete
+    git clone --depth 1 https://github.com/outflanknl/EvilClippy.git "$WORKDIR/EvilClippy" 2>/dev/null \
+        || (cd "$WORKDIR/EvilClippy" && git pull)
+    (cd "$WORKDIR/EvilClippy" && mcs /reference:OpenMcdf.dll,System.IO.Compression.FileSystem.dll -out:EvilClippy.exe *.cs)
+    sudo install -m755 -d /opt/evilclippy
+    sudo install -m644 "$WORKDIR/EvilClippy/EvilClippy.exe" /opt/evilclippy/
+    sudo tee /usr/local/bin/evilclippy >/dev/null <<'WRAPPER'
+#!/bin/bash
+exec mono /opt/evilclippy/EvilClippy.exe "$@"
+WRAPPER
+    sudo chmod +x /usr/local/bin/evilclippy
+    echo "      Prueba: evilclippy -h"
+}
+
+install_android_project_creator() {
+    echo "[android-project-creator] jar oficial con dependencias (ThisIsLibra/AndroidProjectCreator), requiere JDK"
+    local url
+    url=$(curl -s https://api.github.com/repos/ThisIsLibra/AndroidProjectCreator/releases/latest \
+        | grep -o 'https://[^"]*\.jar' | head -1)
+    if [ -z "$url" ]; then
+        echo "      No se pudo resolver automáticamente, usando versión conocida 1.5.2-stable"
+        url="https://github.com/ThisIsLibra/AndroidProjectCreator/releases/download/1.5.2-stable/AndroidProjectCreator-1.5.2-stable-jar-with-dependencies.jar"
+    fi
+    curl -fsSL -o "$WORKDIR/AndroidProjectCreator.jar" "$url"
+    sudo install -m755 -d /opt/android-project-creator
+    sudo install -m644 "$WORKDIR/AndroidProjectCreator.jar" /opt/android-project-creator/
+    sudo tee /usr/local/bin/AndroidProjectCreator >/dev/null <<'WRAPPER'
+#!/bin/bash
+exec java -jar /opt/android-project-creator/AndroidProjectCreator.jar "$@"
+WRAPPER
+    sudo chmod +x /usr/local/bin/AndroidProjectCreator
+    echo "      Prueba: AndroidProjectCreator -h"
+}
+
+install_sandfly_processdecloak() {
+    echo "[sandfly-processdecloak] compilado con Go (sandflysecurity/sandfly-processdecloak)"
+    sudo apt-get install -y golang-go
+    git clone --depth 1 https://github.com/sandflysecurity/sandfly-processdecloak.git "$WORKDIR/sandfly-processdecloak" 2>/dev/null \
+        || (cd "$WORKDIR/sandfly-processdecloak" && git pull)
+    (cd "$WORKDIR/sandfly-processdecloak" && go build -o sandfly-processdecloak .)
+    sudo install -m755 "$WORKDIR/sandfly-processdecloak/sandfly-processdecloak" /usr/local/bin/
+    echo "      Prueba: sandfly-processdecloak"
+}
+
 # =============================================================================
 # Resuelto CON MATIZ: funciona pero con una limitación real conocida
 # =============================================================================
@@ -258,6 +325,11 @@ install_all_no_matices() {
     install_msoffice_crypt
     install_portex
     install_signsrch
+    install_ilspycmd
+    install_flare_floss
+    install_evilclippy
+    install_android_project_creator
+    install_sandfly_processdecloak
 }
 
 case "${1:-}" in
@@ -288,14 +360,20 @@ case "${1:-}" in
     --msoffice-crypt) install_msoffice_crypt ;;
     --portex) install_portex ;;
     --signsrch) install_signsrch ;;
+    --ilspycmd) install_ilspycmd ;;
+    --flare-floss) install_flare_floss ;;
+    --evilclippy) install_evilclippy ;;
+    --android-project-creator) install_android_project_creator ;;
+    --sandfly-processdecloak) install_sandfly_processdecloak ;;
     *)
         echo "Uso: $0 --all | --ghidra | --burpsuite-guide | --<herramienta>"
         echo ""
         echo "Herramientas individuales disponibles:"
         echo "  powershell 7zz unrar aeskeyfind xorsearch jd-gui baksmali binee"
         echo "  manalyze bearparser pycdc msoffice-crypt portex signsrch"
+        echo "  ilspycmd flare-floss evilclippy android-project-creator sandfly-processdecloak"
         echo ""
-        echo "--all instala las 14 resueltas sin matices de una vez."
+        echo "--all instala las 20 resueltas sin matices de una vez."
         echo "Ghidra (con matiz: sin decompilador nativo) y Burp Suite Community"
         echo "(requiere descarga manual con licencia) van aparte."
         exit 1

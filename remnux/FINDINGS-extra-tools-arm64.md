@@ -42,6 +42,11 @@ en vez de intentar instalarlas y fallar.)
 | `msoffice-crypt` | Compilado con make (`herumi/msoffice`) | Binario se llama `.exe` aunque sea nativo Linux |
 | `portex` | Jar precompilado `PortexAnalyzer.jar` (`struppigel/PortEx`) | Requiere JDK |
 | `signsrch` | Compilado con make (mirror `sandsmark/signsrch`) | Requiere `signsrch.sig` aparte para uso real |
+| `ilspycmd` | Herramienta `dotnet` (NuGet), versión fijada 9.1.0.7988 | La resolución "sin versión" falla por metadata NuGet incompleta |
+| `flare-floss` | `pip install flare-floss` (Mandiant FLARE team) | Incluye `vivisect`, sin problema en arm64 |
+| `evilclippy` | Compilado con Mono (`outflanknl/EvilClippy`) | No distribuye binario, solo fuente C# |
+| `android-project-creator` | Jar oficial (`ThisIsLibra/AndroidProjectCreator`) | — |
+| `sandfly-processdecloak` | Compilado con Go, el propio repo incluye `build_linux_arm64.sh` | — |
 
 ### Resuelto con matiz
 
@@ -59,15 +64,23 @@ en vez de intentar instalarlas y fallar.)
   `unrar`): RARLAB no publica ningún binario arm64 Linux. Única vía es
   emulación x86_64 (QEMU o FEX), sin alternativa nativa.
 
-### Sin resolver / pendientes (no investigado a fondo todavía)
+### Sin resolver / aparcados (bugs de build genéricos, no limitación conceptual)
 
-`xorstrings` (aparcado — el mirror con fuente Python/C no está disponible,
-la fusión con `-S` de XORSearch descrita por Didier Stevens no aplica a este
-mirror concreto), `android-project-creator`, `edb-debugger` (soporte arm64
-upstream inmaduro, issue abierto `eteran/edb-debugger#855`), `scdbg`,
-`sandfly-processdecloak`, `ilspycmd`, `evilclippy`, `flare-floss` (estos
-tres últimos con alta probabilidad teórica de funcionar sin parches por ser
-Java/.NET/Python puros, pero sin verificación práctica).
+- **`xorstrings`**: el mirror de DidierStevensSuite solo trae binario PE32/Mach-O,
+  sin fuente Python/C en ese repo. La fusión con `-S` de XORSearch que describe
+  Didier Stevens en su blog no aplica a la versión de `xorsearch.py` de ese mirror.
+- **`scdbg`**: compila (`autoreconf`+`configure`+`make`) pero falla en `libemu.la`
+  por un bug de `libtool` — `$global_symbol_pipe` sale vacío para el triplete
+  `aarch64-*-linux*` en la versión de `libtool` de este proyecto tan antiguo.
+  Persiste tras regenerar `libtool` con `libtoolize --force --copy`. No es que
+  `libemu` no soporte arm64 conceptualmente (emula x86 en software, como
+  Unicorn); es un hueco de portabilidad de las autotools del repo.
+
+### Sin investigar en la práctica (pendiente si se retoma)
+
+- **`edb-debugger`**: soporte arm64 upstream inmaduro, issue abierto
+  `eteran/edb-debugger#855` con reportes de fallos de compilación reales en
+  Ubuntu arm64. No se ha intentado instalar en la VM todavía.
 
 ## Uso del script
 
